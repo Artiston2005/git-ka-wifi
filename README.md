@@ -51,9 +51,9 @@ cd git-ka-wifi
 pip install -r requirements.txt
 ```
 **3. To build EXE:**
-* Download every file from this Github Repo into folder(Git Ka Wifi)
+* Download every file from this Github Repo into folder (Git Ka Wifi)
 * Right click in windows explorer to open terminal in that folder
-* **Install Dpendency**
+* **Install Pyinstaller**
 ```bash
 pip install pyinstaller
 pyinstaller --onefile --windowed --icon=8.ico --add-data "7.png;." main.py
