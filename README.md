@@ -30,8 +30,8 @@ This app runs silently in the background, detects when you've connected to the "
 This is the simple way to install the app.
 
 1.  Go to the [**Releases**](https://github.com/Artiston2005/git-ka-wifi/releases) page of this repository.
-2.  Under the latest release (e.g., `v1.0.0`), download the `gitkawifi_ashwin.exe` file.
-3.  Place `gitkawifi_ashwin.exe` in a folder where you'll keep it (like `C:\Program Files\GitKaWifi`).
+2.  Under the latest release (e.g., `v1.0.0`), download the `gitkawifi_ashwin.exe` file and also 7.png.
+3.  Place `gitkawifi_ashwin.exe` and 7.png both in a folder where you'll keep it (like `C:\Program Files\GitKaWifi`).
 4.  Run `gitkawifi_ashwin.exe`.
 5.  The app will open. Enter your profile info, save it, and you're done!
 6.  For the best experience, go to `Settings > Application` and check **"Run on Windows startup"**.
