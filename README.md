@@ -21,8 +21,8 @@ This app runs silently in the background, detects when you've connected to the "
 * **Run on Startup:** Can be set to launch automatically with Windows.
 * **Advanced Tools:** Includes a network diagnostics tab and an integrated speed test.
 * **Custom Themes:** Personalize the app's look from the settings menu.
-* **Speed Test:** Do speed from the app itself.**Disabled needs enabling by the user by rebuilding exe**
- (To make the speed test working refer to `Developers section`)
+* **Speed Test:** Do speed from the app itself. (**Disabled needs enabling by the user by rebuilding exe**)
+* (To make the speed test working refer to `Developers section`)
 
 ---
 
