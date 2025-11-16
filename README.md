@@ -7,7 +7,7 @@ A system tray utility, built with Python, that automatically logs you into the G
 
 This app runs silently in the background, detects when you've connected to the "git" network, and automatically logs you in using your saved credentials.
 
-### 📸 Screenshot
+### 📸 Screenshot (Theme = Cyborg) P.S. Would Recommend This Theme😊
 <img width="2559" height="1366" alt="Screenshot 2025-11-16 152656" src="https://github.com/user-attachments/assets/527c5aa2-8cc6-4193-a587-1db3094600aa" />
 
 ---
