@@ -21,6 +21,8 @@ This app runs silently in the background, detects when you've connected to the "
 * **Run on Startup:** Can be set to launch automatically with Windows.
 * **Advanced Tools:** Includes a network diagnostics tab and an integrated speed test.
 * **Custom Themes:** Personalize the app's look from the settings menu.
+* **Speed Test:** Do speed from the app itself.**Disabled needs enabling by the user by rebuilding exe**
+ (To make the speed test working refer to `Developers section`)
 
 ---
 
@@ -33,7 +35,6 @@ This is the simple way to install the app.
 4.  Run `gitkawifi_ashwin.exe`.
 5.  The app will open. Enter your profile info, save it, and you're done!
 6.  For the best experience, go to `Settings > Application` and check **"Run on Windows startup"**.
-
 ---
 
 ### 👨‍💻 For Developers (How to Run from Source)
@@ -43,3 +44,10 @@ If you want to run the app directly from the Python code:
 ```bash
 git clone [https://github.com/Artiston2005/git-ka-wifi.git](https://github.com/Artiston2005/git-ka-wifi.git)
 cd git-ka-wifi
+```
+
+**2. Install Dependencies:**
+```bash
+pip install -r requirements.txt
+
+
