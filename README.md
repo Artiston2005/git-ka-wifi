@@ -46,7 +46,7 @@ git clone [https://github.com/Artiston2005/git-ka-wifi.git](https://github.com/A
 cd git-ka-wifi
 ```
 
-**2. Install Dependencies:**
+**2. Install Dependencies (For Speed Test):**
 ```bash
 pip install -r requirements.txt
 
