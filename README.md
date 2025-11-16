@@ -55,7 +55,7 @@ pip install -r requirements.txt
 * Right click in windows explorer to open terminal in that folder
 * **Install Dpendency**
 ```bash
-pip install -r requirements.txt
+pip install pyinstaller
 pyinstaller --onefile --windowed --icon=8.ico --add-data "7.png;." main.py
 ```
 Now find the exe file in dist folder
