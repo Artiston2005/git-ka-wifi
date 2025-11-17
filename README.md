@@ -1,4 +1,4 @@
-# Git ka Wifi (GIT Jaipur Automator)
+# Git ka Wifi (GIT Jaipur WIFI Automator)
 A system tray utility, built with Python, that automatically logs you into the GIT Jaipur captive Wi-Fi portal.
 
 ![Python 3.13](https://img.shields.io/badge/Python-3.13-blue?style=for-the-badge&logo=python)
@@ -7,9 +7,8 @@ A system tray utility, built with Python, that automatically logs you into the G
 
 This app runs silently in the background, detects when you've connected to the "git" network, and automatically logs you in using your saved credentials.
 
-### 📸 Screenshot
-
-*(**How to add your screenshot:** After you paste this text, just drag-and-drop your `Screenshot 2025-11-16 140548.png` file directly into this text box. GitHub will upload it and give you a link that looks like `![image](...)`)*
+### 📸 Screenshot (Theme = Cyborg) P.S. Would Recommend This Theme😊
+<img width="2559" height="1366" alt="Screenshot 2025-11-16 152656" src="https://github.com/user-attachments/assets/527c5aa2-8cc6-4193-a587-1db3094600aa" />
 
 ---
 
@@ -22,6 +21,8 @@ This app runs silently in the background, detects when you've connected to the "
 * **Run on Startup:** Can be set to launch automatically with Windows.
 * **Advanced Tools:** Includes a network diagnostics tab and an integrated speed test.
 * **Custom Themes:** Personalize the app's look from the settings menu.
+* **Speed Test:** Do speed test from the app itself. (**Disabled needs enabling by the user by rebuilding exe**)
+* (To make the speed test working refer to `Developers section`)
 
 ---
 
@@ -29,12 +30,11 @@ This app runs silently in the background, detects when you've connected to the "
 This is the simple way to install the app.
 
 1.  Go to the [**Releases**](https://github.com/Artiston2005/git-ka-wifi/releases) page of this repository.
-2.  Under the latest release (e.g., `v1.0.0`), download the `main.exe` file.
-3.  Place `main.exe` in a folder where you'll keep it (like `C:\Program Files\GitKaWifi`).
-4.  Run `main.exe`.
+2.  Under the latest release (e.g., `v1.0.0`), download the `gitkawifi_ashwin.exe` file and also 7.png.
+3.  Place `gitkawifi_ashwin.exe` and 7.png both in a folder where you'll keep it (like `C:\Program Files\GitKaWifi`).
+4.  Run `gitkawifi_ashwin.exe`.
 5.  The app will open. Enter your profile info, save it, and you're done!
 6.  For the best experience, go to `Settings > Application` and check **"Run on Windows startup"**.
-
 ---
 
 ### 👨‍💻 For Developers (How to Run from Source)
@@ -44,3 +44,18 @@ If you want to run the app directly from the Python code:
 ```bash
 git clone [https://github.com/Artiston2005/git-ka-wifi.git](https://github.com/Artiston2005/git-ka-wifi.git)
 cd git-ka-wifi
+```
+
+**2. Install Dependencies (For Speed Test):**
+```bash
+pip install -r requirements.txt
+```
+**3. To build EXE:**
+* Download every file from this Github Repo into folder (Git Ka Wifi)
+* Right click in windows explorer to open terminal in that folder
+* **Install Pyinstaller**
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed --icon=8.ico --add-data "7.png;." main.py
+```
+Now find the exe file in dist folder
