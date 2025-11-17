@@ -470,30 +470,42 @@ class FortiApp:
         
         tray_title = f"{CONFIG.APP_NAME} - Offline"
 
-        # --- START FIX: Check our state variable first ---
+        # --- START FIX: Non-blocking Lock ---
+        # Check if we are theoretically online
         if self.is_online:
-            # We think we are online. Let's *try* to read the file.
-            with self.session_lock: # Protect file read
+            # Try to acquire the lock WITHOUT blocking.
+            # If we can't get it (because keepalive is running), we just SKIP this update.
+            # This prevents the UI from freezing.
+            if self.session_lock.acquire(blocking=False):
                 try:
-                    s = json.loads(CONFIG.SESSION_FILE.read_text(encoding="utf-8"))
-                    ts, token, ka_url = s.get("timestamp"), s.get("token"), s.get("keepalive_url")
-                    if not all([ts, token, ka_url]): raise ValueError("Incomplete session file")
-                    
-                    # --- Success block ---
-                    self.conn_label.config(text="Online", bootstyle="success"); self.token_label.config(text=f"{token[:10]}...")
-                    info = f"Logged In At: {ts}\nKeepalive URL: {ka_url}\nToken: {token}"
-                    self.info_text.config(state=NORMAL); self.info_text.delete("1.0", END); self.info_text.insert("1.0", info); self.info_text.config(state=DISABLED)
-                    tray_title = f"{CONFIG.APP_NAME} - Online" 
-                    if self.tray_icon: self.tray_icon.title = tray_title
-                    return # We are done, UI is "Online"
+                    # We have the lock, safe to read the file
+                    if CONFIG.SESSION_FILE.exists():
+                        s = json.loads(CONFIG.SESSION_FILE.read_text(encoding="utf-8"))
+                        ts, token, ka_url = s.get("timestamp"), s.get("token"), s.get("keepalive_url")
+                        if not all([ts, token, ka_url]): raise ValueError("Incomplete session file")
+                        
+                        # --- Success block ---
+                        self.conn_label.config(text="Online", bootstyle="success"); self.token_label.config(text=f"{token[:10]}...")
+                        info = f"Logged In At: {ts}\nKeepalive URL: {ka_url}\nToken: {token}"
+                        self.info_text.config(state=NORMAL); self.info_text.delete("1.0", END); self.info_text.insert("1.0", info); self.info_text.config(state=DISABLED)
+                        
+                        tray_title = f"{CONFIG.APP_NAME} - Online" 
+                        if self.tray_icon: self.tray_icon.title = tray_title
+                        return # Done, success
                 
                 except (IOError, json.JSONDecodeError, ValueError) as e: 
-                    # This is a desync! We thought we were online, but the file is bad.
-                    self.log(f"Session desync. File missing/corrupt: {e}", level="ERROR")
-                    self.is_online = False # Correct our state
-                    # Now we fall through to the "Offline" block...
+                    self.log(f"Session file corrupt, resetting state. {e}", level="WARNING")
+                    self.is_online = False
+                    CONFIG.SESSION_FILE.unlink(missing_ok=True)
+                
+                finally:
+                    self.session_lock.release() # Always release!
+            else:
+                # Lock was busy. We simply return and keep the old UI state.
+                # This keeps the window responsive.
+                return 
 
-        # --- This code now runs if self.is_online is FALSE ---
+        # --- Fallback / Offline Block ---
         self.conn_label.config(text="Offline", bootstyle="danger"); self.token_label.config(text="—")
         self.info_text.config(state=NORMAL); self.info_text.delete("1.0", END); self.info_text.insert("1.0", "No active session."); self.info_text.config(state=DISABLED)
         if self.tray_icon: self.tray_icon.title = tray_title
