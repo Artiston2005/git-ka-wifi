@@ -4,13 +4,13 @@ import socket
 import sys
 from datetime import datetime
 from tkinter import messagebox
-from config import CONFIG, SETTINGS # Local import
+from config import CONFIG, SETTINGS 
 
 # --- NEW FEATURE: Run on Startup ---
 try:
     import winreg
 except ImportError:
-    winreg = None # Will disable the feature on non-Windows
+    winreg = None 
 
 # --- End New Feature ---
 
@@ -18,59 +18,105 @@ try:
     from cryptography.fernet import Fernet
 except ImportError:
     Fernet = None
-try:
-    from win10toast import ToastNotifier
-    _toast = ToastNotifier()
-except ImportError:
-    _toast = None
-    try:
-        from plyer import notification as plyer_notify
-    except ImportError:
-        plyer_notify = None
 
-# Global variable to hold the socket lock reference
-_lock_socket = None
+# --- MODERN NOTIFICATIONS: winotify ---
+try:
+    from winotify import Notification, audio
+    HAS_WINOTIFY = True
+except ImportError:
+    HAS_WINOTIFY = False
+
+try:
+    from plyer import notification as plyer_notify
+except ImportError:
+    plyer_notify = None
+
+# --- NEW FEATURE: Robust Single Instance (Mutex) ---
+try:
+    import win32event
+    import win32api
+    import winerror
+except ImportError:
+    win32event = None
+
+_mutex_handle = None
 
 def check_for_lock():
-    """Attempts to acquire a lock on a dedicated local port."""
-    LOCK_PORT = 12345
-    global _lock_socket
-    _lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    """
+    Uses a Windows Named Mutex to ensure only one instance runs.
+    """
+    global _mutex_handle
+    
+    if not win32event:
+        return _check_for_lock_socket_fallback()
+
+    mutex_name = "Global\\GitKaWifi_Instance_Lock_v1"
+    
     try:
-        _lock_socket.bind(("127.0.0.1", LOCK_PORT))
+        _mutex_handle = win32event.CreateMutex(None, False, mutex_name)
+        last_error = win32api.GetLastError()
+        if last_error == winerror.ERROR_ALREADY_EXISTS:
+            return False 
+        return True
+    except Exception:
+        return False
+
+def _check_for_lock_socket_fallback():
+    """Legacy fallback method using sockets."""
+    LOCK_PORT = 12345
+    global _mutex_handle 
+    _mutex_handle = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        _mutex_handle.bind(("127.0.0.1", LOCK_PORT))
         return True
     except socket.error:
-        _lock_socket = None # Ensure it's None if lock fails
+        _mutex_handle = None
         return False
 
 def get_lock_socket():
-    """Returns the global lock socket."""
-    return _lock_socket
+    return _mutex_handle
 
 def append_log(action, details=""):
     ts = datetime.now().isoformat(sep=" ", timespec="seconds")
     try:
+        # Log Rotation: Keep file size under 1MB
+        if CONFIG.LOG_FILE.exists() and CONFIG.LOG_FILE.stat().st_size > 1024 * 1024:
+            try:
+                content = CONFIG.LOG_FILE.read_text(encoding="utf-8").splitlines()
+                if len(content) > 1000:
+                    new_content = "\n".join(content[-1000:]) + "\n"
+                    CONFIG.LOG_FILE.write_text(new_content, encoding="utf-8")
+            except Exception:
+                pass 
+
         with open(CONFIG.LOG_FILE, "a", newline="", encoding="utf-8") as f:
             csv.writer(f).writerow([ts, action, details])
     except IOError: pass
 
 def notify(title, msg):
+    """
+    Sends a notification using winotify (modern Windows API).
+    """
     try:
-        if _toast: 
-            _toast.show_toast(
-                title, 
-                msg, 
-                threaded=True, 
-                duration=5, 
-                icon_path=str(CONFIG.ICON_PNG) if CONFIG.ICON_PNG.exists() else None
+        if HAS_WINOTIFY:
+            toast = Notification(
+                app_id=CONFIG.APP_NAME,
+                title=title,
+                msg=msg,
+                duration="short",
+                icon=str(CONFIG.ICON_PNG.absolute()) if CONFIG.ICON_PNG.exists() else ""
             )
-        elif 'plyer_notify' in globals() and plyer_notify: 
-            plyer_notify.notify(
-                title=title, 
-                message=msg, 
-                app_name=CONFIG.APP_NAME
-            )
-    except Exception: pass
+            # Optional: Add a sound
+            toast.set_audio(audio.Default, loop=False)
+            toast.show()
+            return
+
+        # Fallback to plyer if winotify isn't installed (e.g. non-Windows)
+        if plyer_notify:
+            plyer_notify.notify(title=title, message=msg, app_name=CONFIG.APP_NAME)
+            
+    except Exception as e:
+        print(f"[Notification Failed] {title}: {msg} ({e})")
 
 def ensure_fernet():
     if Fernet is None: return None
@@ -85,15 +131,14 @@ FERNET = ensure_fernet()
 def encrypt_profile(obj: dict) -> str:
     if FERNET: 
         return FERNET.encrypt(json.dumps(obj).encode("utf-8")).decode("utf-8")
-    return json.dumps(obj) # Fallback to plaintext if Fernet fails
+    return json.dumps(obj) 
 
 def decrypt_profile(s: str) -> dict:
     if FERNET:
         try: 
             return json.loads(FERNET.decrypt(s.encode("utf-8")))
         except Exception: 
-            return {} # Decryption failed
-    # Fallback for plaintext
+            return {} 
     try: 
         return json.loads(s)
     except json.JSONDecodeError: 
@@ -104,7 +149,7 @@ def load_profiles():
     try:
         raw = json.load(CONFIG.PROFILES_FILE.open(encoding="utf-8"))
         profiles = {name: decrypt_profile(token) for name, token in raw.items()}
-        return {k: v for k, v in profiles.items() if v} # Filter out empty/failed
+        return {k: v for k, v in profiles.items() if v} 
     except (IOError, json.JSONDecodeError): return {}
 
 def save_profiles(profiles: dict):
@@ -114,12 +159,11 @@ def save_profiles(profiles: dict):
     except IOError: 
         messagebox.showerror("Save Error", "Could not save profiles to disk.")
 
-# --- NEW FEATURE: Run on Startup ---
+# --- Run on Startup ---
 REG_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_VALUE_NAME = CONFIG.APP_NAME
 
 def is_startup_enabled() -> bool:
-    """Check if the app is set to run at startup."""
     if not winreg: return False
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY_PATH, 0, winreg.KEY_READ) as key:
@@ -131,7 +175,6 @@ def is_startup_enabled() -> bool:
         return False
 
 def set_startup(enable: bool):
-    """Enable or disable running the app at startup."""
     if not winreg:
         messagebox.showwarning("Feature Not Available", "This feature is only available on Windows.")
         return
@@ -139,13 +182,11 @@ def set_startup(enable: bool):
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY_PATH, 0, winreg.KEY_WRITE) as key:
             if enable:
-                # Get the full path to the running .exe
-                # In a packaged app (PyInstaller), sys.argv[0] is the .exe path
                 exe_path = f'"{sys.argv[0]}" --startup'
                 winreg.SetValueEx(key, REG_VALUE_NAME, 0, winreg.REG_SZ, exe_path)
             else:
                 winreg.DeleteValue(key, REG_VALUE_NAME)
     except FileNotFoundError:
-        if not enable: pass # Trying to delete a key that doesn't exist
+        if not enable: pass 
     except Exception as e:
-        messagebox.showerror("Registry Error", f"Could not modify startup settings. Do you have permissions?\n{e}")
+        messagebox.showerror("Registry Error", f"Could not modify startup settings.\n{e}")

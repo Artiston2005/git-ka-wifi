@@ -1,7 +1,7 @@
 import argparse
 import gc
 import platform
-import socket # For diagnostics
+import socket 
 import subprocess
 import sys
 import threading
@@ -29,11 +29,8 @@ try:
     import keyboard
 except ImportError:
     keyboard = None
-try:
-    import speedtest
-except ImportError:
-    speedtest = None
 
+speedtest = None
 
 class FortiApp:
     def __init__(self, root, start_silently=False):
@@ -49,28 +46,22 @@ class FortiApp:
         self._threads_stop_event = threading.Event()
         
         self._network_pause_event = threading.Event() 
-        self._network_pause_event.set() # Start in a "paused" state
+        self._network_pause_event.set() 
         
         self.network_threads_active = False
         
-        self.app_initialized = False # Flag to track if UI is built
+        self.app_initialized = False 
         self.start_silently = start_silently
 
         self.log_history = [] 
         self.log_filter_var = ttk.StringVar(value="All")
         
-        # --- START FIX ---
-        # This is the new "single source of truth".
-        # We check if a session file *already* exists on startup.
         self.is_online = CONFIG.SESSION_FILE.exists()
-        # This lock protects session state and file access
         self.session_lock = threading.Lock()
-        # --- END FIX ---
 
         threading.Thread(target=self.background_monitor_worker, daemon=True).start()
 
     def _initialize_app(self):
-        """Builds the UI, sets up tray, and starts background threads."""
         if self.app_initialized:
             return
         self.app_initialized = True
@@ -99,36 +90,35 @@ class FortiApp:
         system = platform.system()
         try:
             if system == "Windows":
-                proc = subprocess.run(["netsh", "wlan", "show", "interfaces"], capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=3, check=True, creationflags=0x08000000)
+                proc = subprocess.run(
+                    ["netsh", "wlan", "show", "interfaces"], 
+                    capture_output=True, text=True, encoding='utf-8', 
+                    errors='ignore', timeout=2, check=True, creationflags=0x08000000
+                )
                 for line in proc.stdout.split('\n'):
                     if "SSID" in line and ":" in line:
-                        ssid = line.split(":", 1)[1].strip()
-                        if ssid: return ssid
+                        key, val = line.split(":", 1)
+                        if "SSID" in key.strip() and "BSSID" not in key:
+                            return val.strip()
             elif system == "Darwin":
                 cmd = ["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-I"]
-                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=3, check=True)
+                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=2, check=True)
                 for line in proc.stdout.split('\n'):
                     if "SSID" in line and ":" in line:
                         ssid = line.split(":", 1)[1].strip()
                         if ssid: return ssid
             elif system == "Linux":
                 cmd = ["iwgetid", "-r"]
-                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=3, check=True)
+                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=2, check=True)
                 ssid = proc.stdout.strip()
                 if ssid: return ssid
         except Exception:
             return None
         return None
 
-    # --- START: MODIFIED/FIXED BACKGROUND WORKER ---
     def background_monitor_worker(self):
-        """
-        Monitors Wi-Fi SSID and pauses/resumes network threads.
-        This worker NO LONGER probes the connection.
-        """
         self.log("Background Monitor started.", level="DEBUG")
-        self._threads_stop_event.wait(2) 
-
+        
         while not self._threads_stop_event.is_set():
             ssid = self._get_current_ssid()
             is_git_network = ssid and "git" in ssid.lower()
@@ -140,27 +130,24 @@ class FortiApp:
                 if not self.network_threads_active:
                     self.log(f"Git network '{ssid}' detected. Resuming operations.")
                     self.network_threads_active = True
-                    self._network_pause_event.clear() # UN-PAUSE
+                    self._network_pause_event.clear() 
                     self.root.after(0, self.root.deiconify)
                     notify(CONFIG.APP_NAME, f"Connected to '{ssid}'. Resuming.")
                     
             else:
+                if not self.app_initialized and not self.start_silently:
+                     self.root.after(0, self._initialize_app)
+
                 if self.network_threads_active:
                     self.log(f"Non-Git network ('{ssid}') detected. Pausing operations.")
                     self.network_threads_active = False
-                    self._network_pause_event.set() # PAUSE
+                    self._network_pause_event.set() 
                     self.root.after(0, self.root.withdraw)
                     notify(CONFIG.APP_NAME, f"Paused: Not on a Git network.")
-            
-            # --- BUGGY CODE BLOCK IS NOW REMOVED ---
-            # The session probe logic that was here is gone.
-            # This fixes the race condition.
-            # --- END OF FIX ---
             
             self._threads_stop_event.wait(SETTINGS.get("session_probe_interval_s"))
         
         self.log("Background Monitor stopped.", level="DEBUG")
-    # --- END: MODIFIED/FIXED BACKGROUND WORKER ---
 
     def start_app_flow(self):
         self.root.after(500, self.refresh_status_ui)
@@ -271,8 +258,8 @@ class FortiApp:
         log_scroll.pack(side=RIGHT, fill=Y)
         self.log_tree.pack(side=LEFT, fill=BOTH, expand=True)
         
-        self.log_tree.tag_configure("ERROR", background="#8B0000", foreground="white") # Dark Red
-        self.log_tree.tag_configure("WARNING", background="#FF8C00", foreground="black") # Dark Orange
+        self.log_tree.tag_configure("ERROR", background="#8B0000", foreground="white") 
+        self.log_tree.tag_configure("WARNING", background="#FF8C00", foreground="black") 
         self.log_tree.tag_configure("DEBUG", foreground="grey")
         
         notebook.add(log_tab, text="Session & Logs")
@@ -286,8 +273,18 @@ class FortiApp:
         self.speed_dl_label = ttk.Label(speed_frame, text="Download: —", font=("Segoe UI", 12)); self.speed_dl_label.pack(anchor=W)
         self.speed_ul_label = ttk.Label(speed_frame, text="Upload: —", font=("Segoe UI", 12)); self.speed_ul_label.pack(anchor=W, pady=5)
         self.speed_ping_label = ttk.Label(speed_frame, text="Ping: —", font=("Segoe UI", 12)); self.speed_ping_label.pack(anchor=W)
-        speed_btn_text = "📶 Run Speed Test" if speedtest else "Speed Test (speedtest-cli not installed)"; speed_btn_state = NORMAL if speedtest else DISABLED
-        self.run_speed_btn = ttk.Button(speed_frame, text=speed_btn_text, command=self._run_speed_test_thread, bootstyle="outline-info", state=speed_btn_state); self.run_speed_btn.pack(pady=10)
+        
+        try:
+            import importlib.util
+            is_st_installed = importlib.util.find_spec("speedtest") is not None
+        except ImportError:
+            is_st_installed = False
+
+        speed_btn_text = "📶 Run Speed Test" if is_st_installed else "Speed Test (speedtest-cli not installed)"
+        speed_btn_state = NORMAL if is_st_installed else DISABLED
+        self.run_speed_btn = ttk.Button(speed_frame, text=speed_btn_text, command=self._run_speed_test_thread, bootstyle="outline-info", state=speed_btn_state)
+        self.run_speed_btn.pack(pady=10)
+        
         notebook.add(perf_tab, text="Performance")
         
         diag_tab = ttk.Frame(notebook, padding=10)
@@ -327,7 +324,7 @@ class FortiApp:
         notebook = ttk.Notebook(win, padding=10); notebook.pack(fill=BOTH, expand=True)
         net_tab = ttk.Frame(notebook, padding=10)
         auto_tab = ttk.Frame(notebook, padding=10)
-        app_tab = ttk.Frame(notebook, padding=10) # New tab for app settings
+        app_tab = ttk.Frame(notebook, padding=10) 
         notebook.add(net_tab, text="Network"); notebook.add(auto_tab, text="Automation"); notebook.add(app_tab, text="Application")
         
         # --- Network Tab ---
@@ -355,45 +352,34 @@ class FortiApp:
         ttk.Label(auto_tab, text="Regex for Time Remaining:").pack(anchor=W, pady=(10,0))
         time_regex_var = ttk.StringVar(value=SETTINGS.get("scrape_time_left_regex")); ttk.Entry(auto_tab, textvariable=time_regex_var).pack(fill=X, pady=2, padx=5)
 
-        # --- NEW FEATURE: Application Tab ---
-        # Theme Selector
+        # --- Application Tab ---
         ttk.Label(app_tab, text="Application Theme:").pack(anchor=W, padx=5)
         theme_var = ttk.StringVar(value=SETTINGS.get("theme"))
         theme_names = self.root.style.theme_names()
         theme_cb = ttk.Combobox(app_tab, textvariable=theme_var, values=theme_names, state="readonly")
         theme_cb.pack(fill=X, pady=(2, 10), padx=5)
 
-        # Run on Startup
         self.startup_var = ttk.BooleanVar(value=is_startup_enabled())
         startup_check = ttk.Checkbutton(app_tab, text="Run on Windows startup", variable=self.startup_var)
         startup_check.pack(anchor=W, pady=5, padx=5)
         if "winreg" not in sys.modules:
             startup_check.config(state=DISABLED)
-        # --- End New Feature ---
-
 
         def save_settings():
-            # Save Network
             SETTINGS.set("target_ssids", [s.strip() for s in ssid_var.get().split(',') if s.strip()])
             SETTINGS.set("probe_urls", [u.strip() for u in probe_var.get().split(',') if u.strip()])
             SETTINGS.set("user_agent", ua_var.get())
             SETTINGS.set("keepalive_interval_s", keep_var.get()); 
             SETTINGS.set("session_probe_interval_s", probe_int_var.get())
-            
-            # Save Automation
             SETTINGS.set("run_speedtest_on_login", speed_var.get()); 
             SETTINGS.set("scrape_data_usage_regex", usage_regex_var.get())
             SETTINGS.set("scrape_time_left_regex", time_regex_var.get())
             
-            # --- NEW FEATURE: Save App Settings ---
-            # Save Startup
             set_startup(self.startup_var.get())
 
-            # Save Theme
             old_theme = SETTINGS.get("theme")
             new_theme = theme_var.get()
             SETTINGS.set("theme", new_theme)
-            # --- End New Feature ---
 
             SETTINGS.save()
             self.client.update_headers()
@@ -411,14 +397,9 @@ class FortiApp:
     def set_ui_busy(self, is_busy, message=""):
         if is_busy:
             self.status_label.config(text=message)
-            
-            # --- FIX ---
-            # We must pack the progressbar *before* the label,
-            # otherwise the label has nothing to be 'before'.
             self.status_progressbar.pack(side=LEFT, padx=(0, 5)) 
             self.status_progressbar.start()
             self.status_label.pack(side=LEFT, padx=(10, 0))
-            # --- END FIX ---
             
             for btn in [self.login_btn, self.logout_btn, self.relogin_btn]: btn.config(state=DISABLED)
             if self.tray_icon: self.tray_icon.title = f"{CONFIG.APP_NAME} - {message}"
@@ -470,28 +451,29 @@ class FortiApp:
         
         tray_title = f"{CONFIG.APP_NAME} - Offline"
 
-        # --- START FIX: Non-blocking Lock ---
-        # Check if we are theoretically online
         if self.is_online:
-            # Try to acquire the lock WITHOUT blocking.
-            # If we can't get it (because keepalive is running), we just SKIP this update.
-            # This prevents the UI from freezing.
             if self.session_lock.acquire(blocking=False):
                 try:
-                    # We have the lock, safe to read the file
                     if CONFIG.SESSION_FILE.exists():
                         s = json.loads(CONFIG.SESSION_FILE.read_text(encoding="utf-8"))
                         ts, token, ka_url = s.get("timestamp"), s.get("token"), s.get("keepalive_url")
-                        if not all([ts, token, ka_url]): raise ValueError("Incomplete session file")
                         
-                        # --- Success block ---
-                        self.conn_label.config(text="Online", bootstyle="success"); self.token_label.config(text=f"{token[:10]}...")
-                        info = f"Logged In At: {ts}\nKeepalive URL: {ka_url}\nToken: {token}"
+                        # FIX: Handle Unmanaged Sessions cleanly
+                        if s.get("type") == "unmanaged":
+                            self.conn_label.config(text="Online (Passthrough)", bootstyle="success")
+                            self.token_label.config(text="—")
+                            info = f"Logged In At: {ts}\nMode: Passthrough (No Portal)\nToken: N/A"
+                        else:
+                            if not all([ts, token, ka_url]): raise ValueError("Incomplete managed session file")
+                            self.conn_label.config(text="Online", bootstyle="success")
+                            self.token_label.config(text=f"{token[:10]}...")
+                            info = f"Logged In At: {ts}\nKeepalive URL: {ka_url}\nToken: {token}"
+                        
                         self.info_text.config(state=NORMAL); self.info_text.delete("1.0", END); self.info_text.insert("1.0", info); self.info_text.config(state=DISABLED)
                         
                         tray_title = f"{CONFIG.APP_NAME} - Online" 
                         if self.tray_icon: self.tray_icon.title = tray_title
-                        return # Done, success
+                        return 
                 
                 except (IOError, json.JSONDecodeError, ValueError) as e: 
                     self.log(f"Session file corrupt, resetting state. {e}", level="WARNING")
@@ -499,13 +481,10 @@ class FortiApp:
                     CONFIG.SESSION_FILE.unlink(missing_ok=True)
                 
                 finally:
-                    self.session_lock.release() # Always release!
+                    self.session_lock.release() 
             else:
-                # Lock was busy. We simply return and keep the old UI state.
-                # This keeps the window responsive.
                 return 
 
-        # --- Fallback / Offline Block ---
         self.conn_label.config(text="Offline", bootstyle="danger"); self.token_label.config(text="—")
         self.info_text.config(state=NORMAL); self.info_text.delete("1.0", END); self.info_text.insert("1.0", "No active session."); self.info_text.config(state=DISABLED)
         if self.tray_icon: self.tray_icon.title = tray_title
@@ -591,16 +570,11 @@ class FortiApp:
     def _login_thread(self, user, pwd):
         self.root.after(0, self.set_ui_busy, True, "Logging in...")
         
-        # --- START FIX ---
-        # Acquire the lock to prevent keepalive from running
         with self.session_lock:
             ok, msg = self.client.login(user, pwd)
             self.log(f"Login result: {msg}", level="INFO" if ok else "ERROR"); 
-            self.is_online = ok # Set our state *while* holding the lock
-        # Lock is released here
-        # --- END FIX ---
+            self.is_online = ok 
         
-        # set_ui_busy(False) will call refresh_status_ui()
         self.root.after(0, self.set_ui_busy, False)
         
         gc.collect() 
@@ -613,14 +587,10 @@ class FortiApp:
     def _logout_thread(self):
         self.root.after(0, self.set_ui_busy, True, "Logging out...")
         
-        # --- START FIX ---
-        # Acquire the lock to prevent keepalive from running
         with self.session_lock:
             ok, msg = self.client.logout()
             self.log(f"Logout result: {msg}", level="INFO" if ok else "ERROR")
-            self.is_online = False # Clear our state
-        # Lock is released here
-        # --- END FIX ---
+            self.is_online = False 
         
         self.root.after(0, self.refresh_status_ui); 
         self.root.after(0, self.set_ui_busy, False)
@@ -631,57 +601,44 @@ class FortiApp:
         threading.Thread(target=self.keepalive_worker, daemon=True).start()
         self.log("Background services (Keepalive) started.", level="DEBUG")
 
-    # --- START: MODIFIED KEEPALIVE WORKER ---
     def keepalive_worker(self):
-        """
-        This worker now also handles disconnects and auto-relogin.
-        It uses a non-blocking lock to avoid racing with the login thread.
-        """
         while not self._threads_stop_event.is_set():
             if self._network_pause_event.is_set():
                 time.sleep(1) 
                 continue
             
-            # --- START FIX ---
-            # We only run keepalive logic if we are supposed to be online.
             if self.keepalive_var.get() and self.is_online:
                 
-                # Try to acquire the lock *without blocking*.
-                # If we can't get it, a login/logout is in progress.
                 if self.session_lock.acquire(blocking=False):
                     try:
-                        # We have the lock, double-check if we're *still* online
                         if not self.is_online: 
-                            continue # State changed while waiting, just skip
+                            continue 
                         
-                        # Now we can safely run the keepalive
                         ok, msg, scraped_data = self.client.keepalive()
                         
                         if ok:
-                            # Keepalive ping was successful
                             self.log(f"Keepalive ping: {msg}", level="DEBUG")
                             if scraped_data: 
                                 self.root.after(0, self._update_scraped_data_ui, scraped_data)
                         else: 
-                            # Keepalive FAILED. This is the only place we detect a disconnect.
+                            # Keepalive FAILED.
                             self.log(f"Keepalive failed: {msg}", level="WARNING")
                             self.log("Session expired. Invalidating session.", level="WARNING")
                             self.is_online = False
                             
                             self.root.after(0, self.refresh_status_ui)
-                            notify(CONFIG.APP_NAME, "Portal session expired.")
                             
                             if self.autorelogin_var.get():
-                                self.log("Auto-relogin triggered.", level="WARNING")
+                                self.log("Auto-relogin triggered (Silent Mode).", level="WARNING")
                                 self.root.after(100, self._initiate_login)
+                            else:
+                                notify(CONFIG.APP_NAME, "Portal session expired.")
+                            
                     finally:
-                        self.session_lock.release() # Always release the lock
+                        self.session_lock.release()
                 else:
-                    # Lock is held (login/logout in progress), skip this run.
                     self.log("Login/logout in progress, skipping keepalive cycle.", level="DEBUG")
-            # --- END FIX ---
             
-            # Wait for the next interval
             self._threads_stop_event.wait(SETTINGS.get("keepalive_interval_s"))
 
     def initiate_startup_login(self):
@@ -700,13 +657,28 @@ class FortiApp:
             self.update_profile_list_and_select(first_profile)
 
     def _run_speed_test_thread(self):
-        if not speedtest: return
+        global speedtest
+        if speedtest is None:
+            try:
+                import speedtest as st_module
+                speedtest = st_module
+            except ImportError:
+                self.log("Speedtest module not found/installed.", level="ERROR")
+                self.root.after(0, self.run_speed_btn.config, {"state": DISABLED, "text": "Module Missing"})
+                return
+
         def _worker():
             self.root.after(0, self.run_speed_btn.config, {"state": DISABLED, "text": "Testing..."})
             self.log("Speed test started...", level="DEBUG")
             try:
-                st = speedtest.Speedtest(); st.get_best_server(); st.download(); st.upload(); res = st.results.dict()
-                dl = f"{res['download'] / 1_000_000:.2f} Mbps"; ul = f"{res['upload'] / 1_000_000:.2f} Mbps"; ping = f"{res['ping']:.2f} ms"
+                st = speedtest.Speedtest()
+                st.get_best_server()
+                st.download()
+                st.upload()
+                res = st.results.dict()
+                dl = f"{res['download'] / 1_000_000:.2f} Mbps"
+                ul = f"{res['upload'] / 1_000_000:.2f} Mbps"
+                ping = f"{res['ping']:.2f} ms"
                 self.root.after(0, self._update_speed_test_ui, dl, ul, ping)
                 self.log(f"Speed test complete: {dl} down, {ul} up, {ping} ping")
             except Exception as e:
@@ -886,7 +858,7 @@ def main():
             try:
                 root = ttk.Window(themename="darkly") 
                 root.withdraw()
-                messagebox.showerror(CONFIG.APP_NAME, "Another instance is already running and has been blocked.")
+                messagebox.showerror(CONFIG.APP_NAME, "Another instance is already running.")
                 root.destroy()
             except Exception: pass
         sys.exit(1)
