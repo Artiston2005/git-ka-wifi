@@ -1,5 +1,4 @@
 import argparse
-import gc
 import platform
 import socket 
 import subprocess
@@ -84,16 +83,17 @@ class FortiApp:
         else:
             self.root.after(200, self.start_app_flow)
         
-        gc.collect() 
+        # REMOVED: gc.collect() - Let automatic GC handle this.
 
     def _get_current_ssid(self) -> str | None:
         system = platform.system()
         try:
             if system == "Windows":
+                # OPTIMIZATION: Reduced timeout to 1s
                 proc = subprocess.run(
                     ["netsh", "wlan", "show", "interfaces"], 
                     capture_output=True, text=True, encoding='utf-8', 
-                    errors='ignore', timeout=2, check=True, creationflags=0x08000000
+                    errors='ignore', timeout=1, check=True, creationflags=0x08000000
                 )
                 for line in proc.stdout.split('\n'):
                     if "SSID" in line and ":" in line:
@@ -102,14 +102,16 @@ class FortiApp:
                             return val.strip()
             elif system == "Darwin":
                 cmd = ["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-I"]
-                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=2, check=True)
+                # OPTIMIZATION: Reduced timeout to 1s
+                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=1, check=True)
                 for line in proc.stdout.split('\n'):
                     if "SSID" in line and ":" in line:
                         ssid = line.split(":", 1)[1].strip()
                         if ssid: return ssid
             elif system == "Linux":
                 cmd = ["iwgetid", "-r"]
-                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=2, check=True)
+                # OPTIMIZATION: Reduced timeout to 1s
+                proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=1, check=True)
                 ssid = proc.stdout.strip()
                 if ssid: return ssid
         except Exception:
@@ -577,7 +579,7 @@ class FortiApp:
         
         self.root.after(0, self.set_ui_busy, False)
         
-        gc.collect() 
+        # REMOVED: gc.collect()
         notify(CONFIG.APP_NAME, "Login Successful!" if ok else f"Login Failed: {msg}")
         if ok and SETTINGS.get("run_speedtest_on_login"): self.root.after(500, self._run_speed_test_thread)
 
@@ -685,7 +687,7 @@ class FortiApp:
                 self.root.after(0, self._update_speed_test_ui, "Error", "Error", "Error"); self.log(f"Speed test failed: {e}", level="ERROR")
             finally:
                 self.root.after(0, self.run_speed_btn.config, {"state": NORMAL, "text": "📶 Run Speed Test"})
-                gc.collect() 
+                # REMOVED: gc.collect()
         threading.Thread(target=_worker, daemon=True).start()
 
     def _update_scraped_data_ui(self, data):
@@ -783,7 +785,7 @@ class FortiApp:
         log_diag("Diagnostics complete.")
         self.log("Diagnostics complete.", level="DEBUG")
         self.root.after(0, self.diag_btn.config, {"state": NORMAL, "text": "🩺 Run Diagnostics"})
-        gc.collect() 
+        # REMOVED: gc.collect()
 
     def setup_tray(self):
         if not pystray: return self.log("pystray not found, tray icon disabled.", level="WARNING")

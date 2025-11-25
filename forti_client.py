@@ -26,10 +26,24 @@ class FortiClient:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
         
+        # Initialize regex placeholders
+        self._usage_regex = None
+        self._time_left_regex = None
+        
         self.update_headers()
 
     def update_headers(self):
         self.session.headers.update({"User-Agent": SETTINGS.get("user_agent")})
+        self._compile_scraping_regexes()
+
+    def _compile_scraping_regexes(self):
+        """Compiles scraping regexes from SETTINGS to avoid re-compiling every loop."""
+        try:
+            self._usage_regex = re.compile(SETTINGS.get("scrape_data_usage_regex"), re.IGNORECASE)
+            self._time_left_regex = re.compile(SETTINGS.get("scrape_time_left_regex"), re.IGNORECASE)
+        except re.error:
+            # If regex is invalid, we simply won't scrape stats
+            pass 
 
     def _extract_magic(self, resp: requests.Response) -> str | None:
         if "fgtauth" in resp.url:
@@ -176,11 +190,14 @@ class FortiClient:
             r = self.session.get(ka_url, timeout=timeout)
             
             scraped_data = {}
-            usage_match = re.search(SETTINGS.get("scrape_data_usage_regex"), r.text, re.IGNORECASE)
-            if usage_match: scraped_data["usage"] = usage_match.group(1).strip()
+            # Use pre-compiled regex for better performance
+            if self._usage_regex:
+                usage_match = self._usage_regex.search(r.text)
+                if usage_match: scraped_data["usage"] = usage_match.group(1).strip()
             
-            time_match = re.search(SETTINGS.get("scrape_time_left_regex"), r.text, re.IGNORECASE)
-            if time_match: scraped_data["time_left"] = time_match.group(1).strip()
+            if self._time_left_regex:
+                time_match = self._time_left_regex.search(r.text)
+                if time_match: scraped_data["time_left"] = time_match.group(1).strip()
             
             return True, f"Keepalive status: {r.status_code}", scraped_data
         except requests.RequestException as e:
