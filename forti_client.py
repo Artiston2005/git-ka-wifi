@@ -104,6 +104,18 @@ class FortiClient:
 
         # 2. Check if we are already online
         if "fgtauth" not in resp.url:
+             # --- NEW CODE START: Check for existing managed session ---
+             try:
+                 if CONFIG.SESSION_FILE.exists():
+                     current_data = json.loads(CONFIG.SESSION_FILE.read_text(encoding="utf-8"))
+                     # If we found a managed session, KEEP IT! Do not overwrite with 'unmanaged'.
+                     if current_data.get("type") == "managed":
+                         return True, "Already online (Managed Session Preserved)"
+             except Exception:
+                 # If the file is corrupt or unreadable, ignore and proceed to create a new unmanaged session
+                 pass
+             # --- NEW CODE END ---
+
              session_data = {
                  "type": "unmanaged",
                  "timestamp": datetime.now().isoformat(sep=" ", timespec="seconds"),
