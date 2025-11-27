@@ -136,6 +136,12 @@ class FortiApp:
                     self.root.after(0, self.root.deiconify)
                     notify(CONFIG.APP_NAME, f"Connected to '{ssid}'. Resuming.")
                     
+                    # --- FIX START: Attempt login if we are offline upon reconnecting ---
+                    if not self.is_online and self.autologin_var.get():
+                        self.log("Network detected but currently offline. Attempting login.")
+                        self.root.after(1000, self._initiate_login) # Small delay to let IP settle
+                    # --- FIX END ---
+                    
             else:
                 if not self.app_initialized and not self.start_silently:
                      self.root.after(0, self._initialize_app)
@@ -627,6 +633,11 @@ class FortiApp:
                             self.log(f"Keepalive failed: {msg}", level="WARNING")
                             self.log("Session expired. Invalidating session.", level="WARNING")
                             self.is_online = False
+                            
+                            # --- FIX START: Delete the dead session file ---
+                            try: CONFIG.SESSION_FILE.unlink(missing_ok=True)
+                            except Exception: pass
+                            # --- FIX END ---
                             
                             self.root.after(0, self.refresh_status_ui)
                             
