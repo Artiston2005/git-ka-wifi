@@ -1,4 +1,5 @@
 # Git ka Wifi (GIT Jaipur WIFI Automator)
+# Only .exe from now on. No code updates.
 A system tray utility, built with Python, that automatically logs you into the GIT Jaipur captive Wi-Fi portal.
 
 ![Python 3.13](https://img.shields.io/badge/Python-3.13-blue?style=for-the-badge&logo=python)
